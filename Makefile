@@ -8,7 +8,15 @@ endif
 .PHONY: build
 build:
 		make sqlbin
-		CGO_ENABLED=0 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o kratos .
+		CGO_ENABLED=0 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -a -o kratos .
+		#CGO_ENABLED=0 GO111MODULE=on GOOS=darwin GOARCH=amd64 go build -a -o kratos .
+
+.PHONY: docker
+docker:
+		packr2
+		make build
+		docker build -t "ory/kratos" -f ./Dockerfile .
+		packr2 clean
 
 .PHONY: init
 init:

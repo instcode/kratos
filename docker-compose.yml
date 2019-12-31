@@ -1,0 +1,83 @@
+###########################################################################
+#######             FOR DEMONSTRATION PURPOSES ONLY                 #######
+###########################################################################
+
+version: '3.4'
+
+services:
+
+  kratos-db:
+    image: postgres:9.6
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=kratos_dev
+    networks:
+      - intranet
+
+  kratos-migrate:
+    depends_on:
+      - kratos-db
+    image: ory/kratos:latest
+    environment:
+      - DSN=postgres://postgres:secret@kratos-db:5432/kratos_dev?sslmode=disable
+    command:
+      migrate sql -e --yes
+    restart: on-failure
+    networks:
+      - intranet
+
+  kratos-selfservice-ui:
+    image: ory/kratos-selfservice-ui-node:v0.0.24
+    ports:
+      - "4435:4435"
+    environment:
+      - PORT=4435
+      - KRATOS_PUBLIC_URL=http://kratos:4433/
+      - KRATOS_BROWSER_URL=http://127.0.0.1:4433/
+      #- NODE_ENV=only-ui
+    networks:
+      - intranet
+
+  kratos:
+    depends_on:
+      - kratos-db
+      - kratos-migrate
+      - kratos-selfservice-ui
+    image: ory/kratos:latest
+    ports:
+      - "4433:4433" # public
+      - "4434:4434" # admin
+    restart: unless-stopped
+    environment:
+      - DSN=postgres://postgres:secret@kratos-db:5432/kratos_dev?sslmode=disable
+      - LOG_LEVEL=debug
+
+      - SECRETS_SESSION=PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
+      - IDENTITY_TRAITS_DEFAULT_SCHEMA_URL=http://kratos-selfservice-ui:4435/registration.schema.json
+
+      - URLS_LOGIN_UI=http://127.0.0.1:4435/auth/login
+      - URLS_REGISTRATION_UI=http://127.0.0.1:4435/auth/registration
+      - URLS_ERROR_UI=http://127.0.0.1:4435/error
+
+      - URLS_SELF_PUBLIC=http://127.0.0.1:4433/
+      - URLS_SELF_ADMIN=http://127.0.0.1:4434/
+
+      - URLS_DEFAULT_RETURN_TO=http://127.0.0.1:4436/
+      - URLS_WHITELISTED_RETURN_TO_DOMAINS=http://127.0.0.1:4436/
+
+      # These settings are set to low values for better performance in development scenarios
+      - HASHERS_ARGON2_PARALLELISM=1
+      - HASHERS_ARGON2_MEMORY=131072 # 128MB
+      - HASHERS_ARGON2_ITERATIONS=2
+
+    command:
+      serve
+    networks:
+      - intranet
+
+networks:
+  intranet:
+    external:
+      name: kratos
